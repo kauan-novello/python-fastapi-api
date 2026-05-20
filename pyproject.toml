@@ -1,0 +1,67 @@
+[tool.poetry]
+name = "backend"
+version = "0.1.0"
+description = "Boilerplate de API em FastAPI com JWT, SQLAlchemy async e Alembic."
+authors = ["Kauan Novello <novellokauan@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.136.1"
+pydantic-settings = "^2.14.0"
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.49"}
+alembic = "^1.18.4"
+pyjwt = "^2.12.1"
+tzdata = "^2026.2"
+pwdlib = {extras = ["argon2"], version = "^0.3.0"}
+aiosqlite = "^0.22.1"
+psycopg = {extras = ["binary"], version = "^3.3.4"}
+uvicorn = {extras = ["standard"], version = "^0.46.0"}
+python-multipart = "^0.0.20"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^9.0.3"
+pytest-cov = "^7.1.0"
+taskipy = "^1.14.1"
+ruff = "^0.15.12"
+typos = "^1.46.0"
+pytest-asyncio = "^1.3.0"
+factory-boy = "^3.3.3"
+freezegun = "^1.5.5"
+testcontainers = "^4.14.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 79
+extend-exclude = ['migrations', 'htmlcov', '.ruff_cache']
+
+[tool.ruff.lint]
+preview = true
+select = ['I', 'F', 'E', 'W', 'PL', 'PT', 'FAST']
+
+[tool.ruff.format]
+preview = true
+quote-style = 'single'
+
+[tool.pytest.ini_options]
+pythonpath = ['.']
+addopts = ['-p', 'no:warnings']
+asyncio_mode = 'auto'
+asyncio_default_fixture_loop_scope = 'function'
+
+[tool.typos.files]
+extend-exclude = ["*.md", "htmlcov/**", ".ruff_cache/**", ".coverage"]
+
+[tool.taskipy.tasks]
+pre_lint = 'typos'
+lint = 'ruff check'
+pre_format = 'ruff check --fix'
+format = 'ruff format'
+run = 'uvicorn backend.app:app --reload'
+pre_test = 'task lint'
+test = 'pytest -s -x --cov=backend -vv'
+post_test = 'coverage html'

@@ -1,0 +1,63 @@
+# Git and version control
+.git/
+.gitignore
+.github/
+.gitlab-ci.yml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.Python
+.venv/
+venv/
+ENV/
+.tox/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Testing and coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+
+# IDE and editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.env
+
+# Documentation
+docs/
+README.md
+LICENSE
+
+# CI/CD
+.github/workflows/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Migrations (optional, include in docker for fresh deployments)
+# migrations/
+
+# Ruff and linters
+.ruff_cache/
+
+# Poetry
+poetry.lock

@@ -9,25 +9,17 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: app_user
-          POSTGRES_PASSWORD: app_password
-          POSTGRES_DB: app_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U app_user -d app_db"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      SECRET_KEY: ${{ secrets.SECRET_KEY }}
-      ALGORITHM: ${{ secrets.ALGORITHM }}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}
+      # Use defaults for CI - tests will use in-memory SQLite
+      DATABASE_URL: sqlite+aiosqlite:///:memory:
+      SECRET_KEY: test-secret-key-for-ci-only-change-in-prod
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      CORS_ORIGINS: http://localhost:3000,http://localhost:5173
+      FRONTEND_URL: http://localhost:3000
+      EMAIL_FROM: test@example.com
+      SMTP_HOST: localhost
+      SMTP_PORT: 587
     steps:
       - uses: actions/checkout@v4
 
@@ -45,5 +37,22 @@ jobs:
       - name: Install dependencies
         run: poetry install --no-interaction --no-ansi
 
+      - name: Run format check
+        run: poetry run ruff format --check backend/
+
+      - name: Run lint
+        run: poetry run ruff check backend/
+
+      - name: Run type check
+        run: poetry run task type_check
+
       - name: Run tests
         run: poetry run task test
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+

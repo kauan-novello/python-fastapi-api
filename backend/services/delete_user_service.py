@@ -2,16 +2,18 @@ from http import HTTPStatus
 
 from fastapi import HTTPException
 
+from backend.configs.permissions import can_manage_user
 from backend.models.user_model import User
 from backend.repositories.user_repository import UserRepository
+from backend.schemas.first_schema import Message
 
 
 class DeleteUserService:
-    def __init__(self, repository: UserRepository):
+    def __init__(self, repository: UserRepository) -> None:
         self.repository = repository
 
-    async def execute(self, user_id: int, current_user: User):
-        if current_user.id != user_id:
+    async def execute(self, user_id: int, current_user: User) -> Message:
+        if not can_manage_user(current_user, user_id):
             raise HTTPException(
                 status_code=HTTPStatus.FORBIDDEN,
                 detail='Not enough permissions',
@@ -26,4 +28,4 @@ class DeleteUserService:
 
         await self.repository.delete(user)
 
-        return {'message': 'User deleted'}
+        return Message(message='User deleted')

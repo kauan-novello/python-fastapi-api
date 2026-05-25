@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from backend.configs.database import get_session
 from backend.models.user_model import User
 from backend.repositories.user_repository import UserRepository
-from backend.schemas.user_schema import UserSchema
+from backend.schemas.user_schema import UserSchema, UserUpdate
 
 TEST_USERS_COUNT = 3
 ALICE_EMAIL = 'alice@example.com'
@@ -34,7 +34,7 @@ async def test_create_user_db(session, mock_db_time):
     """Test creating user in database with timestamps"""
     with mock_db_time(model=User) as time:
         new_user = User(
-            username='alice', password='secret', email='teste@test'
+            username='alice', password='Secret@123', email='teste@test'
         )
         session.add(new_user)
         await session.commit()
@@ -44,8 +44,10 @@ async def test_create_user_db(session, mock_db_time):
     assert asdict(user) == {
         'id': 1,
         'username': 'alice',
-        'password': 'secret',
+        'password': 'Secret@123',
         'email': 'teste@test',
+        'email_verified': False,
+        'role': 'user',
         'created_at': time,
         'updated_at': time,
     }
@@ -58,7 +60,7 @@ async def test_repository_get_by_email_found(session):
     user_data = UserSchema(
         username='alice',
         email='alice@example.com',
-        password='secret',
+        password='Secret@123',
     )
     created_user = await repository.create(user_data)
 
@@ -83,7 +85,7 @@ async def test_repository_get_by_id_found(session):
     user_data = UserSchema(
         username='alice',
         email='alice@example.com',
-        password='secret',
+        password='Secret@123',
     )
     created_user = await repository.create(user_data)
 
@@ -108,7 +110,7 @@ async def test_repository_find_by_username_or_email_by_username(session):
     user_data = UserSchema(
         username='alice',
         email=ALICE_EMAIL,
-        password='secret',
+        password='Secret@123',
     )
     await repository.create(user_data)
 
@@ -126,7 +128,7 @@ async def test_repository_find_by_username_or_email_by_email(session):
     user_data = UserSchema(
         username='alice',
         email=ALICE_EMAIL,
-        password='secret',
+        password='Secret@123',
     )
     await repository.create(user_data)
 
@@ -163,7 +165,7 @@ async def test_repository_get_all_with_users(session):
         user_data = UserSchema(
             username=f'user{i}',
             email=f'user{i}@example.com',
-            password='secret',
+            password='Secret@123',
         )
         await repository.create(user_data)
 
@@ -179,7 +181,7 @@ async def test_repository_get_all_with_pagination(session):
         user_data = UserSchema(
             username=f'user{i}',
             email=f'user{i}@example.com',
-            password='secret',
+            password='Secret@123',
         )
         await repository.create(user_data)
 
@@ -200,14 +202,14 @@ async def test_repository_update_success(session):
     user_data = UserSchema(
         username='alice',
         email='alice@example.com',
-        password='secret',
+        password='Secret@123',
     )
     created_user = await repository.create(user_data)
 
-    updated_data = UserSchema(
+    updated_data = UserUpdate(
         username='bob',
         email='bob@example.com',
-        password='newsecret',
+        password='NewPass@456',
     )
     updated_user = await repository.update(created_user.id, updated_data)
 
@@ -221,10 +223,10 @@ async def test_repository_update_user_not_found(session):
     """Test update returns None when user not found"""
     repository = UserRepository(session)
 
-    update_data = UserSchema(
+    update_data = UserUpdate(
         username='bob',
         email='bob@example.com',
-        password='newsecret',
+        password='NewPass@456',
     )
     result = await repository.update(999, update_data)
 
@@ -238,21 +240,21 @@ async def test_repository_update_integrity_error(session):
     user1_data = UserSchema(
         username='alice',
         email=ALICE_EMAIL,
-        password='secret',
+        password='Secret@123',
     )
     user1 = await repository.create(user1_data)
 
     user2_data = UserSchema(
         username='bob',
         email=BOB_EMAIL,
-        password='secret',
+        password='Secret@123',
     )
     await repository.create(user2_data)
 
-    update_data = UserSchema(
+    update_data = UserUpdate(
         username='alice_updated',
         email=BOB_EMAIL,
-        password='newsecret',
+        password='NewPass@456',
     )
 
     with pytest.raises(IntegrityError):
@@ -265,7 +267,7 @@ async def test_create_rollback_on_integrity_error(session):
     user_data = UserSchema(
         username='alice',
         email='alice@example.com',
-        password='secret',
+        password='Secret@123',
     )
 
     rollback_spy = AsyncMock()

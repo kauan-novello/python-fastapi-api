@@ -5,5 +5,5 @@ def _build_user_data():
     return UserSchema(
         username='alice',
         email='alice@example.com',
-        password='secret',
+        password='Secret@123',
     )

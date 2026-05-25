@@ -3,12 +3,14 @@ from http import HTTPStatus
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
+from backend.configs.permissions import can_manage_user
 from backend.models.user_model import User
+from backend.repositories.user_repository import UserRepository
 from backend.schemas.user_schema import UserUpdate
 
 
 class UpdateUserService:
-    def __init__(self, user_repository):
+    def __init__(self, user_repository: UserRepository) -> None:
         self.user_repository = user_repository
 
     async def execute(
@@ -16,8 +18,8 @@ class UpdateUserService:
         user_id: int,
         current_user: User,
         user_data: UserUpdate,
-    ):
-        if current_user.id != user_id:
+    ) -> User:
+        if not can_manage_user(current_user, user_id):
             raise HTTPException(
                 status_code=HTTPStatus.FORBIDDEN,
                 detail='Not enough permissions',
@@ -30,16 +32,28 @@ class UpdateUserService:
                 detail='User not found',
             )
 
-        user_exists = await self.user_repository.find_by_username_or_email(
-            username=user_data.username,
-            email=user_data.email,
+        username = (
+            user_data.username
+            if user_data.username is not None
+            else user_to_update.username
+        )
+        email = (
+            str(user_data.email)
+            if user_data.email is not None
+            else user_to_update.email
         )
 
-        if user_exists and user_exists.id != user_id:
-            raise HTTPException(
-                status_code=HTTPStatus.CONFLICT,
-                detail='Username or Email already exists',
+        if user_data.username is not None or user_data.email is not None:
+            user_exists = await self.user_repository.find_by_username_or_email(
+                username=username,
+                email=email,
             )
+
+            if user_exists and user_exists.id != user_id:
+                raise HTTPException(
+                    status_code=HTTPStatus.CONFLICT,
+                    detail='Username or Email already exists',
+                )
 
         try:
             user_updated = await self.user_repository.update(
@@ -49,7 +63,7 @@ class UpdateUserService:
             raise HTTPException(
                 status_code=HTTPStatus.CONFLICT,
                 detail='Username or Email already exists',
-            )
+            ) from None
 
         if not user_updated:
             raise HTTPException(

@@ -22,11 +22,33 @@ def test_get_token(client, user):
 def test_token_inexistent_user(client):
     response = client.post(
         '/auth/token',
-        data={'username': 'no_user@no_domain.com', 'password': 'testtest'},
+        data={'username': 'no_user@no_domain.com', 'password': 'TestPass@123'},
     )
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
     assert response.json() == {'detail': 'Incorrect email or password'}
+
+
+def test_token_unverified_email(client):
+    client.post(
+        '/auth/register',
+        json={
+            'username': 'unverified',
+            'email': 'unverified@example.com',
+            'password': 'TestPass@123',
+        },
+    )
+
+    response = client.post(
+        '/auth/token',
+        data={
+            'username': 'unverified@example.com',
+            'password': 'TestPass@123',
+        },
+    )
+
+    assert response.status_code == HTTPStatus.FORBIDDEN
+    assert response.json() == {'detail': 'Email not verified'}
 
 
 def test_token_wrong_password(client, user):
@@ -64,7 +86,7 @@ def test_token_expired_after_time(client, user):
             json={
                 'username': 'wrongwrong',
                 'email': 'wrong@wrong.com',
-                'password': 'wrong',
+                'password': 'TestPass@123',
             },
         )
 
@@ -135,6 +157,6 @@ async def test_refresh_access_token_direct_call(session, user):
         token=refresh_token,
     )
 
-    assert data['token_type'] == 'bearer'
-    assert 'access_token' in data
-    assert 'refresh_token' in data
+    assert data.token_type == 'bearer'
+    assert data.access_token
+    assert data.refresh_token

@@ -12,6 +12,7 @@ from backend.configs.security import (
     verify_password,
 )
 from backend.models.user_model import User
+from backend.repositories.token_repository import RevokedTokenRepository
 
 
 def test_jwt():
@@ -67,7 +68,7 @@ def test_jwt_invalid_token(client):
 
 def test_password_hash_and_verify():
     """Test password hashing and verification"""
-    password = 'mypassword123'
+    password = 'MyPassword@123'
     hashed = get_password_hash(password)
 
     assert hashed != password
@@ -76,7 +77,7 @@ def test_password_hash_and_verify():
 
 def test_verify_password_wrong_password():
     """Test verify_password returns False for wrong password"""
-    password = 'correctpassword'
+    password = 'Correct@123'
     hashed = get_password_hash(password)
 
     assert not verify_password('wrongpassword', hashed)
@@ -134,6 +135,39 @@ async def test_get_current_user_user_not_found(session):
 
     assert exc_info.value.status_code == HTTPStatus.UNAUTHORIZED
     assert exc_info.value.detail == 'Could not validate credentials'
+
+
+async def test_get_current_user_with_expected_token_type_none(session):
+    """Test get_current_user with expected_token_type=None accepts any token"""
+    user = User(
+        username='testuser',
+        email='test@example.com',
+        password=get_password_hash('password123'),
+    )
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+
+    token = create_access_token({'sub': 'test@example.com'})
+
+    current_user = await get_current_user(
+        session=session, token=token, expected_token_type=None
+    )
+
+    assert current_user.email == 'test@example.com'
+
+
+async def test_get_current_user_with_revoked_token(session, user):
+    """Test get_current_user raises when token is revoked"""
+    token = create_access_token({'sub': user.email})
+
+    revoked_repo = RevokedTokenRepository(session)
+    await revoked_repo.add(token=token)
+
+    with pytest.raises(HTTPException) as exc:
+        await get_current_user(session=session, token=token)
+
+    assert exc.value.status_code == HTTPStatus.UNAUTHORIZED
 
 
 def test_create_access_token_has_correct_algorithm():

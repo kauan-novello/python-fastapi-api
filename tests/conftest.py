@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from datetime import datetime
+from email.message import EmailMessage
 
 import pytest
 import pytest_asyncio
@@ -12,8 +13,64 @@ from backend.app import app
 from backend.configs.database import get_session
 from backend.configs.security import create_access_token, get_password_hash
 from backend.models.user_model import table_registry
+from backend.utils.rate_limiter import (
+    forgot_password_limiter,
+    login_limiter,
+    register_limiter,
+    resend_verification_limiter,
+    reset_password_limiter,
+    verify_email_limiter,
+)
 
 from .user.user_factory import UserFactory
+
+MAIL_OUTBOX: list[EmailMessage] = []
+
+
+@pytest.fixture(autouse=True)
+def clear_rate_limiters():
+    register_limiter.clear()
+    login_limiter.clear()
+    forgot_password_limiter.clear()
+    reset_password_limiter.clear()
+    verify_email_limiter.clear()
+    resend_verification_limiter.clear()
+
+
+@pytest.fixture(autouse=True)
+def mock_smtp(monkeypatch):
+    MAIL_OUTBOX.clear()
+
+    class DummySMTP:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        @staticmethod
+        def starttls():
+            return None
+
+        @staticmethod
+        def login(username, password):
+            return None
+
+        @staticmethod
+        def send_message(message):
+            MAIL_OUTBOX.append(message)
+
+    monkeypatch.setattr('smtplib.SMTP', DummySMTP)
+    yield
+    MAIL_OUTBOX.clear()
+
+
+@pytest.fixture
+def mail_outbox():
+    return MAIL_OUTBOX
 
 
 @pytest.fixture
@@ -47,8 +104,9 @@ async def session():
 
 @pytest_asyncio.fixture
 async def user(session):
-    password = 'testtest'
+    password = 'TestPass@123'
     user = UserFactory(password=get_password_hash(password))
+    user.email_verified = True
     session.add(user)
     await session.commit()
     await session.refresh(user)
@@ -64,9 +122,38 @@ def token(user):
 
 
 @pytest_asyncio.fixture
-async def other_user(session):
-    password = 'testtest'
+async def unverified_user(session):
+    password = 'TestPass@123'
     user = UserFactory(password=get_password_hash(password))
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+
+    user.clean_password = password
+
+    return user
+
+
+@pytest_asyncio.fixture
+async def admin_user(session):
+    password = 'TestPass@123'
+    user = UserFactory(password=get_password_hash(password))
+    user.email_verified = True
+    user.role = 'admin'
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+
+    user.clean_password = password
+
+    return user
+
+
+@pytest_asyncio.fixture
+async def other_user(session):
+    password = 'TestPass@123'
+    user = UserFactory(password=get_password_hash(password))
+    user.email_verified = True
 
     session.add(user)
     await session.commit()

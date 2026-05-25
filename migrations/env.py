@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from backend.models.user_model import table_registry
+from backend.models.revoked_token import RevokedToken  # noqa: F401
 from backend.configs.settings import Settings
 
 

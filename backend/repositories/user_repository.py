@@ -1,33 +1,55 @@
-from sqlalchemy import select
+from typing import Any, cast
+
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.selectable import Select
 
 from backend.configs.security import get_password_hash
 from backend.models.user_model import User
 from backend.schemas.user_schema import UserCreate, UserUpdate
 
 
+def _apply_user_search(
+    query: Select[Any],
+    search: str | None,
+) -> Select[Any]:
+    if not search:
+        return query
+    pattern = f'%{search.strip()}%'
+    return query.where(
+        or_(
+            User.username.ilike(pattern),
+            User.email.ilike(pattern),
+        )
+    )
+
+
 class UserRepository:
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_by_email(self, email: str):
-        return await self.session.scalar(
-            select(User).where(User.email == email)
+    async def get_by_email(self, email: str) -> User | None:
+        return cast(
+            User | None,
+            await self.session.scalar(select(User).where(User.email == email)),
         )
 
     async def find_by_username_or_email(
         self,
         username: str,
         email: str,
-    ):
-        return await self.session.scalar(
-            select(User).where(
-                (User.username == username) | (User.email == email)
-            )
+    ) -> User | None:
+        return cast(
+            User | None,
+            await self.session.scalar(
+                select(User).where(
+                    (User.username == username) | (User.email == email)
+                )
+            ),
         )
 
-    async def create(self, user_data: UserCreate):
+    async def create(self, user_data: UserCreate) -> User:
         user = User(
             username=user_data.username,
             email=user_data.email,
@@ -44,26 +66,41 @@ class UserRepository:
 
         return user
 
-    async def get_all(self, skip: int = 0, limit: int = 100):
-        result = await self.session.scalars(
-            select(User).offset(skip).limit(limit)
-        )
-        return result.all()
+    async def count_all(self, search: str | None = None) -> int:
+        query = select(func.count()).select_from(User)
+        query = _apply_user_search(query, search)
+        result = await self.session.scalar(query)
+        return int(result or 0)
 
-    async def get_by_id(self, user_id: int):
-        return await self.session.scalar(
-            select(User).where(User.id == user_id)
+    async def get_all(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        search: str | None = None,
+    ) -> list[User]:
+        query = select(User).offset(skip).limit(limit)
+        query = _apply_user_search(query, search)
+        result = await self.session.scalars(query)
+        return list(result.all())
+
+    async def get_by_id(self, user_id: int) -> User | None:
+        return cast(
+            User | None,
+            await self.session.scalar(select(User).where(User.id == user_id)),
         )
 
-    async def update(self, user_id: int, user_data: UserUpdate):
+    async def update(self, user_id: int, user_data: UserUpdate) -> User | None:
         user = await self.get_by_id(user_id)
 
         if not user:
             return None
 
-        user.username = user_data.username
-        user.email = user_data.email
-        user.password = get_password_hash(user_data.password)
+        if user_data.username is not None:
+            user.username = user_data.username
+        if user_data.email is not None:
+            user.email = str(user_data.email)
+        if user_data.password is not None:
+            user.password = get_password_hash(user_data.password)
 
         try:
             await self.session.commit()
@@ -74,6 +111,13 @@ class UserRepository:
 
         return user
 
-    async def delete(self, user: User):
+    async def delete(self, user: User) -> None:
         await self.session.delete(user)
         await self.session.commit()
+
+    async def mark_email_verified(self, user: User) -> User:
+        user.email_verified = True
+        await self.session.commit()
+        await self.session.refresh(user)
+
+        return user
